@@ -1,0 +1,9 @@
+compact: true
+quiet: true
+framework:
+  - terraform
+
+# Every skip below has been verified by running checkov with the skip removed
+# and confirming the check actually fires.
+skip-check:
+  - CKV_AWS_136 # Encryption defaults to AES256 (AWS-managed keys) so consumers can adopt the module without provisioning a CMK first. Callers who need a customer-managed key set encryption_type = "KMS" and pass kms_key. Forcing KMS as the default would make the minimal usage example fail.

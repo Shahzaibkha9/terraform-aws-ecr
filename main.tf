@@ -20,30 +20,44 @@ resource "aws_ecr_lifecycle_policy" "policy" {
   repository = aws_ecr_repository.repo.name
 
   policy = jsonencode({
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Keep last ${var.keep_count} tagged images"
-        selection = {
-          tagStatus     = "tagged"
-          tagPrefixList = [var.default_tag, "v"]
-          countType     = "imageCountMoreThan"
-          countNumber   = var.keep_count
+    rules = concat(
+      [
+        for i, prefix in local.lifecycle_tag_prefixes : {
+          rulePriority = i + 1
+          description  = "Keep last ${var.keep_count} images tagged with '${prefix}' prefix"
+          selection = {
+            tagStatus     = "tagged"
+            tagPrefixList = [prefix]
+            countType     = "imageCountMoreThan"
+            countNumber   = var.keep_count
+          }
+          action = { type = "expire" }
         }
-        action = { type = "expire" }
-      },
-      {
-        rulePriority = 2
-        description  = "Expire untagged images older than ${var.untagged_expiry_days} days"
-        selection = {
-          tagStatus   = "untagged"
-          countType   = "sinceImagePushed"
-          countUnit   = "days"
-          countNumber = var.untagged_expiry_days
+      ],
+      [
+        {
+          rulePriority = length(local.lifecycle_tag_prefixes) + 1
+          description  = "Expire untagged images older than ${var.untagged_expiry_days} days"
+          selection = {
+            tagStatus   = "untagged"
+            countType   = "sinceImagePushed"
+            countUnit   = "days"
+            countNumber = var.untagged_expiry_days
+          }
+          action = { type = "expire" }
+        },
+        {
+          rulePriority = length(local.lifecycle_tag_prefixes) + 2
+          description  = "Catch-all: keep last ${var.keep_count} tagged images (SHA, branch names, anything the prefix rules above did not match)"
+          selection = {
+            tagStatus   = "any"
+            countType   = "imageCountMoreThan"
+            countNumber = var.keep_count
+          }
+          action = { type = "expire" }
         }
-        action = { type = "expire" }
-      }
-    ]
+      ]
+    )
   })
 }
 
